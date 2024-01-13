@@ -1,9 +1,31 @@
 <?php
+function user_logout(){
+    return session_destroy();
+}
+
+function user_set_session($data){
+    $_SESSION['user'] = $data;
+}
+
+function user_session(){
+    if(isset($_SESSION['user']) && $_SESSION['user']){
+        $_SESSION['user'] = user_show_by_id($_SESSION['user']['id']);
+    }
+
+    return $_SESSION['user'] ?? null;
+}
 ##############################################################################################
 // registr
 function user_registr($data){
     $data['type'] = 'user';
-    return user_add($data);
+
+    $reData = user_add($data);
+    
+    $user = $reData['data'];
+
+    user_set_session($user);
+
+    return $reData;
 }
 
 ##############################################################################################
@@ -31,6 +53,8 @@ function user_login($email, $password){
     if($password != $user['password']){
         return myResponse(false, 'كلمة المرور مختلفة عن المرتبطة بهذا البريد الالكتروني');
     }
+
+    user_set_session($user);
 
     return myResponse(true, sprintf('تم تسجيل الدخول بنجاح، مرحبا بك يا %s', $user['name']), $user);
 }
@@ -93,11 +117,18 @@ function user_add($data){
         return myResponse(false, 'الرجاء ادخال كلمة المرور، وجيب ان تكون اكثر من 5 حروف او ارقام واقل من 8');
     }
 
+    if(isset($data['password_confirm'])){
+        $password_confirm  = $data['password_confirm'] ?? '';
+        if($password != $password_confirm){
+            return myResponse(false, 'كلمة المرور غير متطابقة');
+        }
+    }
+
     $myData = [
         'type'=>$type,
-        'name'=>$name,
-        'email'=>$email,
-        'password'=>$password,
+        'name'=>sql_scan($name),
+        'email'=>sql_scan($email),
+        'password'=>sql_scan($password),
         'datetime'=>date('Y-m-d H:i:s'),
     ];
 
@@ -106,13 +137,17 @@ function user_add($data){
         return myResponse(false, 'حدث خطأ غير معروف، الرجاء المحاولة مرة اخرى');
     }
 
-    return myResponse(true, 'تم ادخال اليوزر بنجاح');
+    $user = user_show_by_email($email);
+
+    return myResponse(true, 'تم ادخال اليوزر بنجاح', $user);
 }
 
 ##############################################################################################
 // edit
 function user_edit($id, $data){ 
+    
     $user = user_show_by_id($id); 
+
     if(!$user){
         return myResponse(false, 'هذا المستخدم غير موجود');
     }
@@ -142,9 +177,9 @@ function user_edit($id, $data){
     }
 
     $myData = [
-        'type'=>$type,
-        'name'=>$name,
-        'email'=>$email,
+        'type'=>$user['id'] == 1 ? 'admin' : $type,
+        'name'=>sql_scan($name),
+        'email'=>sql_scan($email),
     ];
 
     $re = sql_update('users', $myData, sprintf('WHERE `id`=%d', $id)); 
@@ -164,6 +199,18 @@ function user_remove($id){
     if(!$user){
         return myResponse(false, 'هذا المستخدم غير موجود');
     }
+
+    // هل هذا الشخص هو الادمن الافتراضي الاسكربت
+    if($user['id'] == 1){
+        return myResponse(false, 'لا يمكن حذف المدير الاساسي');
+    }
+
+    $count_news = news_get_count_by_user_id($user['id']);
+    if($count_news > 0){
+        return myResponse(false, "لا يمكنك حذف المستخدم بسبب ان لدية عدد {$count_news} خبر");
+    }
+
+    comment_remove_by_user_id($user['id']);
 
     $re = sql_delete('users', sprintf('WHERE `id`=%d', $id));
     if(!$re){
