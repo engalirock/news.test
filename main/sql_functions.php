@@ -7,7 +7,7 @@ function myResponse($status, $message='', $data=[]){
 // scan
 function sql_scan($str){
     global $Mysqli;
-
+    $str = trim($str);
     return mysqli_real_escape_string($Mysqli, $str);
 }
 

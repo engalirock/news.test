@@ -43,7 +43,7 @@ function category_add($data){
     }
 
     $myData = [
-        'name'=>$name,
+        'name'=>sql_scan($name),
     ];
 
     $re = sql_insert('categories', $myData);
@@ -67,8 +67,12 @@ function category_edit($id, $data){
         return myResponse(false, 'الرجاء ادخال الاسم بشكل صحيح');
     }
 
+    if($name != $category['name'] && category_show_by_name($name)){
+        return myResponse(false, 'هذا الاسم مستخدم من قبل، الرجاء كتابة اختيار اسم جديد');
+    }
+
     $myData = [
-        'name'=>$name,
+        'name'=>sql_scan($name),
     ];
 
     $re = sql_update('categories', $myData, sprintf('WHERE `id`=%d', $id)); 
